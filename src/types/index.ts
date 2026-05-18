@@ -35,6 +35,10 @@ export interface ProductFilters {
   search?: string;
 }
 
+export type CurrencyCode = "INR" | "USD" | "EUR" | "GBP" | "AED" | "SGD";
+
+export type PaymentMethod = "cod" | "upi";
+
 export interface CheckoutCustomer {
   name: string;
   email: string;
@@ -56,6 +60,8 @@ export interface OrderItemDTO {
   quantity: number;
   imageUrl: string;
   lineTotal: number;
+  convertedPrice: number;
+  convertedLineTotal: number;
 }
 
 export interface OrderDTO {
@@ -65,6 +71,12 @@ export interface OrderDTO {
   items: OrderItemDTO[];
   subtotal: number;
   total: number;
+  currency: CurrencyCode;
+  exchangeRate: number;
+  convertedSubtotal: number;
+  convertedTotal: number;
+  paymentMethod: PaymentMethod;
+  paymentStatus: "pending" | "paid" | "failed";
   status: "placed" | "cancelled";
   createdAt: string;
 }

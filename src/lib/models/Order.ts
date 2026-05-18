@@ -25,6 +25,8 @@ const orderItemSchema = new Schema(
     quantity: { type: Number, required: true, min: 1 },
     imageUrl: { type: String, required: true },
     lineTotal: { type: Number, required: true, min: 0 },
+    convertedPrice: { type: Number, required: true, min: 0 },
+    convertedLineTotal: { type: Number, required: true, min: 0 },
   },
   { _id: false },
 );
@@ -36,6 +38,27 @@ const orderSchema = new Schema(
     items: { type: [orderItemSchema], required: true },
     subtotal: { type: Number, required: true, min: 0 },
     total: { type: Number, required: true, min: 0 },
+    currency: {
+      type: String,
+      enum: ["INR", "USD", "EUR", "GBP", "AED", "SGD"],
+      default: "INR",
+      required: true,
+    },
+    exchangeRate: { type: Number, default: 1, required: true, min: 0 },
+    convertedSubtotal: { type: Number, required: true, min: 0 },
+    convertedTotal: { type: Number, required: true, min: 0 },
+    paymentMethod: {
+      type: String,
+      enum: ["cod", "upi"],
+      default: "cod",
+      required: true,
+    },
+    paymentStatus: {
+      type: String,
+      enum: ["pending", "paid", "failed"],
+      default: "pending",
+      required: true,
+    },
     status: {
       type: String,
       enum: ["placed", "cancelled"],

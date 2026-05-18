@@ -2,11 +2,25 @@ import { Types } from "mongoose";
 import { connectDB } from "@/lib/mongodb";
 import { Order } from "@/lib/models/Order";
 import { Product } from "@/lib/models/Product";
-import type { CartItem, CheckoutCustomer, OrderDTO, OrderItemDTO } from "@/types";
+import {
+  convertFromInr,
+  getExchangeRate,
+  isCurrencyCode,
+} from "@/lib/utils";
+import type {
+  CartItem,
+  CheckoutCustomer,
+  CurrencyCode,
+  OrderDTO,
+  OrderItemDTO,
+  PaymentMethod,
+} from "@/types";
 
 interface CreateOrderInput {
   customer: CheckoutCustomer;
   items: Pick<CartItem, "productId" | "quantity">[];
+  currency?: string;
+  paymentMethod?: string;
 }
 
 function clean(value: unknown): string {
@@ -53,7 +67,20 @@ function makeOrderNumber(): string {
   return `DF-${Date.now().toString(36).toUpperCase()}-${suffix}`;
 }
 
+function normalizeCurrency(currency: string | undefined): CurrencyCode {
+  return currency && isCurrencyCode(currency) ? currency : "INR";
+}
+
+function normalizePaymentMethod(method: string | undefined): PaymentMethod {
+  return method === "upi" ? "upi" : "cod";
+}
+
 function toOrderDTO(doc: Record<string, unknown>): OrderDTO {
+  const currency = normalizeCurrency(doc.currency as string | undefined);
+  const exchangeRate = (doc.exchangeRate as number | undefined) ?? getExchangeRate(currency);
+  const subtotal = doc.subtotal as number;
+  const total = doc.total as number;
+
   return {
     _id: (doc._id as { toString(): string }).toString(),
     orderNumber: doc.orderNumber as string,
@@ -67,9 +94,24 @@ function toOrderDTO(doc: Record<string, unknown>): OrderDTO {
       quantity: item.quantity as number,
       imageUrl: item.imageUrl as string,
       lineTotal: item.lineTotal as number,
+      convertedPrice:
+        (item.convertedPrice as number | undefined) ??
+        convertFromInr(item.price as number, currency),
+      convertedLineTotal:
+        (item.convertedLineTotal as number | undefined) ??
+        convertFromInr(item.lineTotal as number, currency),
     })),
-    subtotal: doc.subtotal as number,
-    total: doc.total as number,
+    subtotal,
+    total,
+    currency,
+    exchangeRate,
+    convertedSubtotal:
+      (doc.convertedSubtotal as number | undefined) ?? convertFromInr(subtotal, currency),
+    convertedTotal:
+      (doc.convertedTotal as number | undefined) ?? convertFromInr(total, currency),
+    paymentMethod: normalizePaymentMethod(doc.paymentMethod as string | undefined),
+    paymentStatus:
+      (doc.paymentStatus as "pending" | "paid" | "failed" | undefined) ?? "pending",
     status: doc.status as "placed" | "cancelled",
     createdAt: (doc.createdAt as Date).toISOString(),
   };
@@ -79,6 +121,9 @@ export async function createOrder(input: CreateOrderInput): Promise<OrderDTO> {
   await connectDB();
 
   const customer = validateCustomer(input.customer);
+  const currency = normalizeCurrency(input.currency);
+  const exchangeRate = getExchangeRate(currency);
+  const paymentMethod = normalizePaymentMethod(input.paymentMethod);
   const requestedItems = input.items
     .map((item) => ({
       productId: clean(item.productId),
@@ -115,12 +160,15 @@ export async function createOrder(input: CreateOrderInput): Promise<OrderDTO> {
       quantity: item.quantity,
       imageUrl: product.imageUrl,
       lineTotal,
+      convertedPrice: convertFromInr(product.price, currency),
+      convertedLineTotal: convertFromInr(lineTotal, currency),
     };
   });
 
   const subtotal = Number(
     orderItems.reduce((sum, item) => sum + item.lineTotal, 0).toFixed(2),
   );
+  const convertedSubtotal = convertFromInr(subtotal, currency);
 
   const order = await Order.create({
     orderNumber: makeOrderNumber(),
@@ -134,9 +182,17 @@ export async function createOrder(input: CreateOrderInput): Promise<OrderDTO> {
       quantity: item.quantity,
       imageUrl: item.imageUrl,
       lineTotal: item.lineTotal,
+      convertedPrice: item.convertedPrice,
+      convertedLineTotal: item.convertedLineTotal,
     })),
     subtotal,
     total: subtotal,
+    currency,
+    exchangeRate,
+    convertedSubtotal,
+    convertedTotal: convertedSubtotal,
+    paymentMethod,
+    paymentStatus: "pending",
     status: "placed",
   });
 

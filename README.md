@@ -1,4 +1,4 @@
-# Spice&Dry — Dry Fruits & Spices Shop
+# Bala Balaji Spices & Dryfruits
 
 A learning project: Next.js storefront with MongoDB (Mongoose), product catalog, and client-side cart.
 

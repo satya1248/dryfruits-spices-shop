@@ -5,6 +5,8 @@ import type { CartItem, CheckoutCustomer } from "@/types";
 interface OrderRequestBody {
   customer?: CheckoutCustomer;
   items?: Pick<CartItem, "productId" | "quantity">[];
+  currency?: string;
+  paymentMethod?: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -21,6 +23,8 @@ export async function POST(request: NextRequest) {
     const data = await createOrder({
       customer: body.customer,
       items: body.items,
+      currency: body.currency,
+      paymentMethod: body.paymentMethod,
     });
 
     return NextResponse.json({ data }, { status: 201 });

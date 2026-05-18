@@ -5,8 +5,13 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { EmptyState } from "@/components/EmptyState";
 import { useCart } from "@/context/CartContext";
-import { formatPrice } from "@/lib/utils";
-import type { CheckoutCustomer, OrderDTO } from "@/types";
+import {
+  convertFromInr,
+  formatPrice,
+  getDefaultCurrencyForCountry,
+  SUPPORTED_CURRENCIES,
+} from "@/lib/utils";
+import type { CheckoutCustomer, CurrencyCode, OrderDTO, PaymentMethod } from "@/types";
 
 const initialCustomer: CheckoutCustomer = {
   name: "",
@@ -29,11 +34,17 @@ export default function CheckoutPage() {
   const router = useRouter();
   const { items, subtotal, isHydrated, clearCart } = useCart();
   const [customer, setCustomer] = useState(initialCustomer);
+  const [currency, setCurrency] = useState<CurrencyCode>("INR");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cod");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
   function updateField(field: keyof CheckoutCustomer, value: string) {
     setCustomer((prev) => ({ ...prev, [field]: value }));
+
+    if (field === "country") {
+      setCurrency(getDefaultCurrencyForCountry(value));
+    }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -47,6 +58,8 @@ export default function CheckoutPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           customer,
+          currency,
+          paymentMethod,
           items: items.map((item) => ({
             productId: item.productId,
             quantity: item.quantity,
@@ -68,6 +81,8 @@ export default function CheckoutPage() {
       setIsSubmitting(false);
     }
   }
+
+  const convertedSubtotal = convertFromInr(subtotal, currency);
 
   if (!isHydrated) {
     return (
@@ -106,8 +121,8 @@ export default function CheckoutPage() {
       <div className="mt-4 flex flex-col gap-2">
         <h1 className="text-3xl font-bold text-stone-900">Mock checkout</h1>
         <p className="max-w-2xl text-stone-600">
-          Enter delivery details to save a test order in MongoDB. No payment is
-          collected in this learning version.
+          Enter delivery details and choose an India-friendly mock payment
+          method. No real payment is collected in this learning version.
         </p>
       </div>
 
@@ -207,17 +222,84 @@ export default function CheckoutPage() {
 
         <aside className="h-fit rounded-2xl border border-amber-200/70 bg-white p-6">
           <h2 className="text-xl font-semibold text-stone-900">Order summary</h2>
+          <div className="mt-4 grid gap-4">
+            <label>
+              <span className="text-sm font-medium text-stone-700">Display currency</span>
+              <select
+                value={currency}
+                onChange={(event) => setCurrency(event.target.value as CurrencyCode)}
+                className="mt-1 w-full rounded-lg border border-amber-200 bg-white px-4 py-2.5 text-sm text-stone-800 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-200"
+              >
+                {SUPPORTED_CURRENCIES.map((item) => (
+                  <option key={item.code} value={item.code}>
+                    {item.code} - {item.label}
+                  </option>
+                ))}
+              </select>
+              <span className="mt-1 block text-xs text-stone-500">
+                Defaults from delivery country; rates are fixed for this learning project.
+              </span>
+            </label>
+
+            <fieldset>
+              <legend className="text-sm font-medium text-stone-700">
+                Payment method
+              </legend>
+              <div className="mt-2 grid gap-2">
+                <label className="flex cursor-pointer gap-3 rounded-lg border border-amber-200 p-3 text-sm">
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="cod"
+                    checked={paymentMethod === "cod"}
+                    onChange={() => setPaymentMethod("cod")}
+                    className="mt-1"
+                  />
+                  <span>
+                    <span className="block font-medium text-stone-900">
+                      Cash on Delivery
+                    </span>
+                    <span className="text-stone-500">
+                      Collect payment when the order is delivered.
+                    </span>
+                  </span>
+                </label>
+                <label className="flex cursor-pointer gap-3 rounded-lg border border-amber-200 p-3 text-sm">
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="upi"
+                    checked={paymentMethod === "upi"}
+                    onChange={() => setPaymentMethod("upi")}
+                    className="mt-1"
+                  />
+                  <span>
+                    <span className="block font-medium text-stone-900">
+                      UPI placeholder
+                    </span>
+                    <span className="text-stone-500">
+                      Marks the order as pending UPI payment. Gateway integration comes later.
+                    </span>
+                  </span>
+                </label>
+              </div>
+            </fieldset>
+          </div>
+
           <div className="mt-4 space-y-3">
             {items.map((item) => (
               <div key={item.productId} className="flex justify-between gap-4 text-sm">
                 <div>
                   <p className="font-medium text-stone-800">{item.name}</p>
                   <p className="text-stone-500">
-                    {item.quantity} x {formatPrice(item.price)}
+                    {item.quantity} x {formatPrice(convertFromInr(item.price, currency), currency)}
                   </p>
                 </div>
                 <p className="font-medium text-stone-900">
-                  {formatPrice(item.price * item.quantity)}
+                  {formatPrice(
+                    convertFromInr(item.price * item.quantity, currency),
+                    currency,
+                  )}
                 </p>
               </div>
             ))}
@@ -225,11 +307,10 @@ export default function CheckoutPage() {
           <div className="mt-6 border-t border-amber-200 pt-4">
             <div className="flex justify-between text-lg font-semibold text-stone-900">
               <span>Total</span>
-              <span>{formatPrice(subtotal)}</span>
+              <span>{formatPrice(convertedSubtotal, currency)}</span>
             </div>
             <p className="mt-2 text-xs text-stone-500">
-              This is a mock order. Payment and delivery integrations are future
-              learning steps.
+              Product prices are stored in INR and converted for display at checkout.
             </p>
           </div>
           <button

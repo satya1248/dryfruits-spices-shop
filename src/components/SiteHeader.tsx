@@ -16,7 +16,7 @@ export function SiteHeader() {
     <header className="sticky top-0 z-50 border-b border-amber-200/80 bg-amber-50/95 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
         <Link href="/" className="text-xl font-bold tracking-tight text-amber-950">
-          Spice<span className="text-amber-700">&</span>Dry
+          Bala Balaji Spices <span className="text-amber-700">&</span> Dryfruits
         </Link>
         <nav className="flex items-center gap-6">
           {navLinks.map((link) => (

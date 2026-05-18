@@ -11,7 +11,7 @@ const geistSans = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "Spice&Dry | Dry Fruits & Spices",
+  title: "Bala Balaji Spices & Dryfruits",
   description:
     "A learning storefront for premium dry fruits and aromatic spices.",
 };

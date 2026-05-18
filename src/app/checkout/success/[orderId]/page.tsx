@@ -52,6 +52,13 @@ export default async function OrderSuccessPage({ params }: OrderSuccessPageProps
         <div className="mt-6 rounded-xl bg-amber-50 p-4">
           <p className="text-sm text-stone-600">Order number</p>
           <p className="text-lg font-semibold text-stone-900">{order.orderNumber}</p>
+          <p className="mt-2 text-sm text-stone-600">
+            Payment:{" "}
+            <span className="font-medium text-stone-900">
+              {order.paymentMethod === "cod" ? "Cash on Delivery" : "UPI placeholder"}
+            </span>{" "}
+            ({order.paymentStatus})
+          </p>
         </div>
 
         <section className="mt-8">
@@ -65,19 +72,26 @@ export default async function OrderSuccessPage({ params }: OrderSuccessPageProps
                 <div>
                   <p className="font-medium text-stone-900">{item.name}</p>
                   <p className="text-stone-500">
-                    {item.quantity} x {formatPrice(item.price)} / {item.unit}
+                    {item.quantity} x{" "}
+                    {formatPrice(item.convertedPrice, order.currency)} / {item.unit}
                   </p>
                 </div>
                 <p className="font-semibold text-stone-900">
-                  {formatPrice(item.lineTotal)}
+                  {formatPrice(item.convertedLineTotal, order.currency)}
                 </p>
               </div>
             ))}
           </div>
           <div className="mt-4 flex justify-between text-lg font-semibold text-stone-900">
             <span>Total</span>
-            <span>{formatPrice(order.total)}</span>
+            <span>{formatPrice(order.convertedTotal, order.currency)}</span>
           </div>
+          {order.currency !== "INR" && (
+            <p className="mt-2 text-xs text-stone-500">
+              Converted from INR at a fixed learning-project rate of{" "}
+              {order.exchangeRate}.
+            </p>
+          )}
         </section>
 
         <section className="mt-8 rounded-xl border border-amber-200 p-4">
