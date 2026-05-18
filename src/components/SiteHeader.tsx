@@ -6,6 +6,7 @@ import { useCart } from "@/context/CartContext";
 const navLinks = [
   { href: "/", label: "Home" },
   { href: "/products", label: "Products" },
+  { href: "/checkout", label: "Checkout" },
 ];
 
 export function SiteHeader() {

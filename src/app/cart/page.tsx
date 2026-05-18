@@ -69,15 +69,23 @@ export default function CartPage() {
           </span>
         </div>
         <p className="mt-4 text-sm text-stone-500">
-          Checkout and order history are planned for a future learning milestone.
-          For now, your cart is saved in this browser via localStorage.
+          This checkout saves a mock order in MongoDB. Payment integration can
+          be added in a later learning step.
         </p>
-        <Link
-          href="/products"
-          className="mt-6 inline-block rounded-full bg-amber-800 px-6 py-2.5 text-sm font-medium text-amber-50 transition hover:bg-amber-900"
-        >
-          Continue shopping
-        </Link>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Link
+            href="/checkout"
+            className="inline-block rounded-full bg-amber-800 px-6 py-2.5 text-sm font-medium text-amber-50 transition hover:bg-amber-900"
+          >
+            Checkout
+          </Link>
+          <Link
+            href="/products"
+            className="inline-block rounded-full border border-amber-300 bg-white px-6 py-2.5 text-sm font-medium text-stone-800 transition hover:border-amber-500"
+          >
+            Continue shopping
+          </Link>
+        </div>
       </div>
     </div>
   );
