@@ -13,6 +13,10 @@ import {
 } from "@/lib/utils";
 import type { CheckoutCustomer, CurrencyCode, OrderDTO, PaymentMethod } from "@/types";
 
+function isOnlinePayment(method: PaymentMethod): boolean {
+  return method === "razorpay" || method === "upi";
+}
+
 const initialCustomer: CheckoutCustomer = {
   name: "",
   email: "",
@@ -62,7 +66,7 @@ export default function CheckoutPage() {
 
   function selectPaymentMethod(method: PaymentMethod) {
     setPaymentMethod(method);
-    if (method !== "razorpay") {
+    if (!isOnlinePayment(method)) {
       setIsRazorpayReady(false);
     }
   }
@@ -82,8 +86,9 @@ export default function CheckoutPage() {
 
     try {
       // Online payments must be in INR for this learning implementation.
-      const orderCurrency: CurrencyCode =
-        paymentMethod === "razorpay" ? "INR" : currency;
+      const orderCurrency: CurrencyCode = isOnlinePayment(paymentMethod)
+        ? "INR"
+        : currency;
 
       const response = await fetch("/api/orders", {
         method: "POST",
@@ -105,7 +110,7 @@ export default function CheckoutPage() {
         throw new Error(result.error ?? "Could not place order.");
       }
 
-      if (paymentMethod !== "razorpay") {
+      if (!isOnlinePayment(paymentMethod)) {
         clearCart();
         router.push(`/checkout/success/${result.data._id}`);
         return;
@@ -169,6 +174,17 @@ export default function CheckoutPage() {
             setError(err instanceof Error ? err.message : "Payment failed.");
           }
         },
+        ...(paymentMethod === "upi"
+          ? {
+              method: {
+                upi: true,
+                card: false,
+                netbanking: false,
+                wallet: false,
+                emi: false,
+              },
+            }
+          : {}),
         modal: {
           ondismiss: () => {
             setError("Payment cancelled. Your order is saved as pending.");
@@ -192,7 +208,7 @@ export default function CheckoutPage() {
   const convertedSubtotal = convertFromInr(subtotal, currency);
 
   useEffect(() => {
-    if (paymentMethod !== "razorpay") return;
+    if (!isOnlinePayment(paymentMethod)) return;
 
     if (window.Razorpay) {
       queueMicrotask(() => setIsRazorpayReady(true));
@@ -249,8 +265,8 @@ export default function CheckoutPage() {
       <div className="mt-4 flex flex-col gap-2">
         <h1 className="text-3xl font-bold text-stone-900">Checkout</h1>
         <p className="max-w-2xl text-stone-600">
-          Enter delivery details and pay online with Razorpay (UPI, cards,
-          netbanking) or choose Cash on Delivery.
+          Enter delivery details and pay with UPI, Razorpay (cards and
+          netbanking), or Cash on Delivery.
         </p>
       </div>
 
@@ -378,6 +394,23 @@ export default function CheckoutPage() {
                   <input
                     type="radio"
                     name="paymentMethod"
+                    value="upi"
+                    checked={paymentMethod === "upi"}
+                    onChange={() => selectPaymentMethod("upi")}
+                    className="mt-1"
+                  />
+                  <span>
+                    <span className="block font-medium text-stone-900">UPI</span>
+                    <span className="text-stone-500">
+                      Pay with GPay, PhonePe, Paytm, or any UPI app via Razorpay.
+                      Status updates to Paid after successful payment.
+                    </span>
+                  </span>
+                </label>
+                <label className="flex cursor-pointer gap-3 rounded-lg border border-amber-200 p-3 text-sm">
+                  <input
+                    type="radio"
+                    name="paymentMethod"
                     value="razorpay"
                     checked={paymentMethod === "razorpay"}
                     onChange={() => selectPaymentMethod("razorpay")}
@@ -388,8 +421,8 @@ export default function CheckoutPage() {
                       Pay online (Razorpay)
                     </span>
                     <span className="text-stone-500">
-                      UPI, cards, netbanking, and wallets. Payment status updates to
-                      Paid after successful checkout.
+                      Cards, netbanking, and wallets. Payment status updates to Paid
+                      after successful checkout.
                     </span>
                   </span>
                 </label>
@@ -437,14 +470,14 @@ export default function CheckoutPage() {
             <div className="flex justify-between text-lg font-semibold text-stone-900">
               <span>Total</span>
               <span>
-                {paymentMethod === "razorpay"
+                {isOnlinePayment(paymentMethod)
                   ? formatPrice(subtotal, "INR")
                   : formatPrice(convertedSubtotal, currency)}
               </span>
             </div>
             <p className="mt-2 text-xs text-stone-500">
-              {paymentMethod === "razorpay"
-                ? "Online payments are processed in INR."
+              {isOnlinePayment(paymentMethod)
+                ? "UPI and Razorpay payments are processed in INR."
                 : "Product prices are stored in INR and converted for display at checkout."}
             </p>
           </div>
@@ -455,11 +488,15 @@ export default function CheckoutPage() {
           >
             {isSubmitting
               ? "Processing..."
-              : paymentMethod === "razorpay"
+              : paymentMethod === "upi"
                 ? isRazorpayReady
-                  ? "Pay with Razorpay"
-                  : "Loading Razorpay..."
-                : "Place order"}
+                  ? "Pay with UPI"
+                  : "Loading payment..."
+                : paymentMethod === "razorpay"
+                  ? isRazorpayReady
+                    ? "Pay with Razorpay"
+                    : "Loading Razorpay..."
+                  : "Place order"}
           </button>
         </aside>
       </form>

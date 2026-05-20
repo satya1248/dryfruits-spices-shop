@@ -54,7 +54,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Razorpay order mismatch" }, { status: 400 });
     }
 
-    order.paymentMethod = "razorpay";
+    if (order.paymentMethod !== "upi") {
+      order.paymentMethod = "razorpay";
+    }
     order.paymentProvider = "razorpay";
     order.paymentStatus = "paid";
     order.razorpayOrderId = razorpay_order_id;

@@ -40,7 +40,9 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    order.paymentMethod = "razorpay";
+    if (order.paymentMethod !== "upi") {
+      order.paymentMethod = "razorpay";
+    }
     order.paymentProvider = "razorpay";
     order.razorpayOrderId = rpOrder.id;
     await order.save();

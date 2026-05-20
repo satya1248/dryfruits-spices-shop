@@ -219,7 +219,10 @@ export async function createOrder(input: CreateOrderInput): Promise<OrderDTO> {
     convertedTotal: convertedSubtotal,
     paymentMethod,
     paymentStatus: "pending",
-    paymentProvider: paymentMethod === "razorpay" ? "razorpay" : undefined,
+    paymentProvider:
+      paymentMethod === "razorpay" || paymentMethod === "upi"
+        ? "razorpay"
+        : undefined,
     status: "placed",
     shippingStatus: "processing",
     carrier: "Bala Balaji Delivery",
@@ -234,7 +237,7 @@ export async function createOrder(input: CreateOrderInput): Promise<OrderDTO> {
 
   const orderDto = toOrderDTO(order.toObject() as Record<string, unknown>);
 
-  if (paymentMethod !== "razorpay") {
+  if (paymentMethod === "cod") {
     dispatchOrderPlaced(orderDto);
   }
 

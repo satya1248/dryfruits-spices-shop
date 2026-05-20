@@ -21,6 +21,7 @@ export function getPaymentStatusLabel(
   if (status === "failed") return "Failed";
 
   if (method === "cod") return "Pay on delivery";
+  if (method === "upi") return "Complete UPI payment";
   if (method === "razorpay") return "Payment pending";
   return "Pending";
 }

@@ -40,7 +40,7 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ### 4. Order notifications (email + SMS)
 
-When an order is placed (COD immediately, Razorpay after payment is verified) and when an admin marks it **Out for delivery**, customers receive an email and SMS.
+When an order is placed (COD immediately, UPI/Razorpay after payment is verified) and when an admin marks it **Out for delivery**, customers receive an email and SMS.
 
 Add to `.env.local` (see `.env.example`):
 
