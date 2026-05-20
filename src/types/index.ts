@@ -37,7 +37,7 @@ export interface ProductFilters {
 
 export type CurrencyCode = "INR" | "USD" | "EUR" | "GBP" | "AED" | "SGD";
 
-export type PaymentMethod = "cod" | "upi";
+export type PaymentMethod = "cod" | "upi" | "razorpay";
 
 export interface CheckoutCustomer {
   name: string;
@@ -77,6 +77,9 @@ export interface OrderDTO {
   convertedTotal: number;
   paymentMethod: PaymentMethod;
   paymentStatus: "pending" | "paid" | "failed";
+  paymentProvider?: "razorpay";
+  razorpayOrderId?: string;
+  razorpayPaymentId?: string;
   status: "placed" | "cancelled";
   createdAt: string;
 }

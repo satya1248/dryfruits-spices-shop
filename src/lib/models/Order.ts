@@ -49,7 +49,7 @@ const orderSchema = new Schema(
     convertedTotal: { type: Number, required: true, min: 0 },
     paymentMethod: {
       type: String,
-      enum: ["cod", "upi"],
+      enum: ["cod", "upi", "razorpay"],
       default: "cod",
       required: true,
     },
@@ -59,6 +59,9 @@ const orderSchema = new Schema(
       default: "pending",
       required: true,
     },
+    paymentProvider: { type: String, enum: ["razorpay"] },
+    razorpayOrderId: { type: String, index: true },
+    razorpayPaymentId: { type: String },
     status: {
       type: String,
       enum: ["placed", "cancelled"],

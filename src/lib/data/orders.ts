@@ -72,7 +72,9 @@ function normalizeCurrency(currency: string | undefined): CurrencyCode {
 }
 
 function normalizePaymentMethod(method: string | undefined): PaymentMethod {
-  return method === "upi" ? "upi" : "cod";
+  if (method === "upi") return "upi";
+  if (method === "razorpay") return "razorpay";
+  return "cod";
 }
 
 function toOrderDTO(doc: Record<string, unknown>): OrderDTO {
@@ -112,6 +114,9 @@ function toOrderDTO(doc: Record<string, unknown>): OrderDTO {
     paymentMethod: normalizePaymentMethod(doc.paymentMethod as string | undefined),
     paymentStatus:
       (doc.paymentStatus as "pending" | "paid" | "failed" | undefined) ?? "pending",
+    paymentProvider: doc.paymentProvider as "razorpay" | undefined,
+    razorpayOrderId: doc.razorpayOrderId as string | undefined,
+    razorpayPaymentId: doc.razorpayPaymentId as string | undefined,
     status: doc.status as "placed" | "cancelled",
     createdAt: (doc.createdAt as Date).toISOString(),
   };
@@ -193,6 +198,7 @@ export async function createOrder(input: CreateOrderInput): Promise<OrderDTO> {
     convertedTotal: convertedSubtotal,
     paymentMethod,
     paymentStatus: "pending",
+    paymentProvider: paymentMethod === "razorpay" ? "razorpay" : undefined,
     status: "placed",
   });
 

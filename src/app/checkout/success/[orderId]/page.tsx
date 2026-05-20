@@ -55,7 +55,11 @@ export default async function OrderSuccessPage({ params }: OrderSuccessPageProps
           <p className="mt-2 text-sm text-stone-600">
             Payment:{" "}
             <span className="font-medium text-stone-900">
-              {order.paymentMethod === "cod" ? "Cash on Delivery" : "UPI placeholder"}
+              {order.paymentMethod === "cod"
+                ? "Cash on Delivery"
+                : order.paymentMethod === "razorpay"
+                  ? "Online payment (Razorpay)"
+                  : "UPI placeholder"}
             </span>{" "}
             ({order.paymentStatus})
           </p>

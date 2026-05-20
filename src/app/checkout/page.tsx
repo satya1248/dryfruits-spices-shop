@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { EmptyState } from "@/components/EmptyState";
 import { useCart } from "@/context/CartContext";
 import {
@@ -30,6 +30,26 @@ interface OrderResponse {
   error?: string;
 }
 
+interface RazorpayOrderResponse {
+  data?: {
+    keyId: string;
+    razorpayOrderId: string;
+    amount: number;
+    currency: string;
+    orderId: string;
+    orderNumber: string;
+  };
+  error?: string;
+}
+
+declare global {
+  interface Window {
+    Razorpay?: new (options: Record<string, unknown>) => {
+      open: () => void;
+    };
+  }
+}
+
 export default function CheckoutPage() {
   const router = useRouter();
   const { items, subtotal, isHydrated, clearCart } = useCart();
@@ -38,6 +58,14 @@ export default function CheckoutPage() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cod");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [isRazorpayReady, setIsRazorpayReady] = useState(false);
+
+  function selectPaymentMethod(method: PaymentMethod) {
+    setPaymentMethod(method);
+    if (method !== "razorpay") {
+      setIsRazorpayReady(false);
+    }
+  }
 
   function updateField(field: keyof CheckoutCustomer, value: string) {
     setCustomer((prev) => ({ ...prev, [field]: value }));
@@ -53,12 +81,16 @@ export default function CheckoutPage() {
     setIsSubmitting(true);
 
     try {
+      // Online payments must be in INR for this learning implementation.
+      const orderCurrency: CurrencyCode =
+        paymentMethod === "razorpay" ? "INR" : currency;
+
       const response = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           customer,
-          currency,
+          currency: orderCurrency,
           paymentMethod,
           items: items.map((item) => ({
             productId: item.productId,
@@ -73,8 +105,83 @@ export default function CheckoutPage() {
         throw new Error(result.error ?? "Could not place order.");
       }
 
-      clearCart();
-      router.push(`/checkout/success/${result.data._id}`);
+      if (paymentMethod !== "razorpay") {
+        clearCart();
+        router.push(`/checkout/success/${result.data._id}`);
+        return;
+      }
+
+      if (!isRazorpayReady || !window.Razorpay) {
+        throw new Error("Razorpay Checkout is not ready yet. Please try again.");
+      }
+
+      const rpResp = await fetch("/api/payments/razorpay/order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: result.data._id }),
+      });
+
+      const rp = (await rpResp.json()) as RazorpayOrderResponse;
+      if (!rpResp.ok || !rp.data) {
+        throw new Error(rp.error ?? "Failed to start Razorpay payment.");
+      }
+
+      const rpData = rp.data;
+
+      const options = {
+        key: rpData.keyId,
+        amount: rpData.amount,
+        currency: rpData.currency,
+        name: "Bala Balaji Spices & Dryfruits",
+        description: `Order ${rpData.orderNumber}`,
+        order_id: rpData.razorpayOrderId,
+        prefill: {
+          name: customer.name,
+          email: customer.email,
+          contact: customer.phone,
+        },
+        notes: {
+          orderId: rpData.orderId,
+        },
+        handler: async (response: {
+          razorpay_order_id: string;
+          razorpay_payment_id: string;
+          razorpay_signature: string;
+        }) => {
+          try {
+            const verifyResp = await fetch("/api/payments/razorpay/verify", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                orderId: rpData.orderId,
+                ...response,
+              }),
+            });
+
+            const verify = (await verifyResp.json()) as { error?: string };
+            if (!verifyResp.ok) {
+              throw new Error(verify.error ?? "Payment verification failed.");
+            }
+
+            clearCart();
+            router.push(`/checkout/success/${rpData.orderId}`);
+          } catch (err) {
+            setError(err instanceof Error ? err.message : "Payment failed.");
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            setError("Payment cancelled. Your order is saved as pending.");
+          },
+        },
+      };
+
+      const RazorpayCtor = window.Razorpay;
+      if (!RazorpayCtor) {
+        throw new Error("Razorpay Checkout is not available.");
+      }
+      const instance = new RazorpayCtor(options);
+      instance.open();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not place order.");
     } finally {
@@ -83,6 +190,27 @@ export default function CheckoutPage() {
   }
 
   const convertedSubtotal = convertFromInr(subtotal, currency);
+
+  useEffect(() => {
+    if (paymentMethod !== "razorpay") return;
+
+    if (window.Razorpay) {
+      queueMicrotask(() => setIsRazorpayReady(true));
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    script.onload = () => queueMicrotask(() => setIsRazorpayReady(true));
+    script.onerror = () =>
+      queueMicrotask(() => setError("Failed to load Razorpay Checkout."));
+    document.body.appendChild(script);
+
+    return () => {
+      script.remove();
+    };
+  }, [paymentMethod]);
 
   if (!isHydrated) {
     return (
@@ -252,7 +380,7 @@ export default function CheckoutPage() {
                     name="paymentMethod"
                     value="cod"
                     checked={paymentMethod === "cod"}
-                    onChange={() => setPaymentMethod("cod")}
+                    onChange={() => selectPaymentMethod("cod")}
                     className="mt-1"
                   />
                   <span>
@@ -270,7 +398,7 @@ export default function CheckoutPage() {
                     name="paymentMethod"
                     value="upi"
                     checked={paymentMethod === "upi"}
-                    onChange={() => setPaymentMethod("upi")}
+                    onChange={() => selectPaymentMethod("upi")}
                     className="mt-1"
                   />
                   <span>
@@ -279,6 +407,24 @@ export default function CheckoutPage() {
                     </span>
                     <span className="text-stone-500">
                       Marks the order as pending UPI payment. Gateway integration comes later.
+                    </span>
+                  </span>
+                </label>
+                <label className="flex cursor-pointer gap-3 rounded-lg border border-amber-200 p-3 text-sm">
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="razorpay"
+                    checked={paymentMethod === "razorpay"}
+                    onChange={() => selectPaymentMethod("razorpay")}
+                    className="mt-1"
+                  />
+                  <span>
+                    <span className="block font-medium text-stone-900">
+                      Online payment (Razorpay)
+                    </span>
+                    <span className="text-stone-500">
+                      Pay using UPI/cards/netbanking/wallets. (INR only)
                     </span>
                   </span>
                 </label>
@@ -307,10 +453,16 @@ export default function CheckoutPage() {
           <div className="mt-6 border-t border-amber-200 pt-4">
             <div className="flex justify-between text-lg font-semibold text-stone-900">
               <span>Total</span>
-              <span>{formatPrice(convertedSubtotal, currency)}</span>
+              <span>
+                {paymentMethod === "razorpay"
+                  ? formatPrice(subtotal, "INR")
+                  : formatPrice(convertedSubtotal, currency)}
+              </span>
             </div>
             <p className="mt-2 text-xs text-stone-500">
-              Product prices are stored in INR and converted for display at checkout.
+              {paymentMethod === "razorpay"
+                ? "Online payments are processed in INR."
+                : "Product prices are stored in INR and converted for display at checkout."}
             </p>
           </div>
           <button
@@ -318,7 +470,13 @@ export default function CheckoutPage() {
             disabled={isSubmitting}
             className="mt-6 w-full rounded-full bg-amber-800 px-6 py-3 text-sm font-medium text-amber-50 transition hover:bg-amber-900 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isSubmitting ? "Placing order..." : "Place mock order"}
+            {isSubmitting
+              ? "Processing..."
+              : paymentMethod === "razorpay"
+                ? isRazorpayReady
+                  ? "Pay with Razorpay"
+                  : "Loading Razorpay..."
+                : "Place order"}
           </button>
         </aside>
       </form>
