@@ -39,6 +39,19 @@ export type CurrencyCode = "INR" | "USD" | "EUR" | "GBP" | "AED" | "SGD";
 
 export type PaymentMethod = "cod" | "upi" | "razorpay";
 
+export type ShippingStatus =
+  | "processing"
+  | "packed"
+  | "shipped"
+  | "out_for_delivery"
+  | "delivered";
+
+export interface ShippingUpdateDTO {
+  status: ShippingStatus;
+  message: string;
+  at: string;
+}
+
 export interface CheckoutCustomer {
   name: string;
   email: string;
@@ -81,5 +94,9 @@ export interface OrderDTO {
   razorpayOrderId?: string;
   razorpayPaymentId?: string;
   status: "placed" | "cancelled";
+  shippingStatus: ShippingStatus;
+  trackingNumber?: string;
+  carrier?: string;
+  shippingUpdates: ShippingUpdateDTO[];
   createdAt: string;
 }

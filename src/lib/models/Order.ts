@@ -68,6 +68,26 @@ const orderSchema = new Schema(
       default: "placed",
       required: true,
     },
+    shippingStatus: {
+      type: String,
+      enum: ["processing", "packed", "shipped", "out_for_delivery", "delivered"],
+      default: "processing",
+      required: true,
+      index: true,
+    },
+    trackingNumber: { type: String, trim: true, index: true },
+    carrier: { type: String, trim: true, default: "Bala Balaji Delivery" },
+    shippingUpdates: [
+      {
+        status: {
+          type: String,
+          enum: ["processing", "packed", "shipped", "out_for_delivery", "delivered"],
+          required: true,
+        },
+        message: { type: String, required: true, trim: true },
+        at: { type: Date, required: true, default: Date.now },
+      },
+    ],
   },
   { timestamps: true },
 );

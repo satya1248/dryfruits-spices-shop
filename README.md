@@ -38,6 +38,18 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+### 4. Order notifications (email + SMS)
+
+When an order is placed (COD immediately, Razorpay after payment is verified) and when an admin marks it **Out for delivery**, customers receive an email and SMS.
+
+Add to `.env.local` (see `.env.example`):
+
+- **SMTP** — `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`
+- **Twilio** — `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER`
+- **App URL** — `NEXT_PUBLIC_APP_URL` (links in messages)
+
+If SMTP or Twilio are not configured, messages are logged to the server console as `[email:mock]` / `[sms:mock]` so you can test locally without credentials.
+
 ## Scripts
 
 | Command        | Description                    |

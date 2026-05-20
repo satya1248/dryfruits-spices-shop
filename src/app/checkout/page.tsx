@@ -55,7 +55,7 @@ export default function CheckoutPage() {
   const { items, subtotal, isHydrated, clearCart } = useCart();
   const [customer, setCustomer] = useState(initialCustomer);
   const [currency, setCurrency] = useState<CurrencyCode>("INR");
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cod");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("razorpay");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [isRazorpayReady, setIsRazorpayReady] = useState(false);
@@ -247,10 +247,10 @@ export default function CheckoutPage() {
       </Link>
 
       <div className="mt-4 flex flex-col gap-2">
-        <h1 className="text-3xl font-bold text-stone-900">Mock checkout</h1>
+        <h1 className="text-3xl font-bold text-stone-900">Checkout</h1>
         <p className="max-w-2xl text-stone-600">
-          Enter delivery details and choose an India-friendly mock payment
-          method. No real payment is collected in this learning version.
+          Enter delivery details and pay online with Razorpay (UPI, cards,
+          netbanking) or choose Cash on Delivery.
         </p>
       </div>
 
@@ -378,6 +378,25 @@ export default function CheckoutPage() {
                   <input
                     type="radio"
                     name="paymentMethod"
+                    value="razorpay"
+                    checked={paymentMethod === "razorpay"}
+                    onChange={() => selectPaymentMethod("razorpay")}
+                    className="mt-1"
+                  />
+                  <span>
+                    <span className="block font-medium text-stone-900">
+                      Pay online (Razorpay)
+                    </span>
+                    <span className="text-stone-500">
+                      UPI, cards, netbanking, and wallets. Payment status updates to
+                      Paid after successful checkout.
+                    </span>
+                  </span>
+                </label>
+                <label className="flex cursor-pointer gap-3 rounded-lg border border-amber-200 p-3 text-sm">
+                  <input
+                    type="radio"
+                    name="paymentMethod"
                     value="cod"
                     checked={paymentMethod === "cod"}
                     onChange={() => selectPaymentMethod("cod")}
@@ -388,43 +407,7 @@ export default function CheckoutPage() {
                       Cash on Delivery
                     </span>
                     <span className="text-stone-500">
-                      Collect payment when the order is delivered.
-                    </span>
-                  </span>
-                </label>
-                <label className="flex cursor-pointer gap-3 rounded-lg border border-amber-200 p-3 text-sm">
-                  <input
-                    type="radio"
-                    name="paymentMethod"
-                    value="upi"
-                    checked={paymentMethod === "upi"}
-                    onChange={() => selectPaymentMethod("upi")}
-                    className="mt-1"
-                  />
-                  <span>
-                    <span className="block font-medium text-stone-900">
-                      UPI placeholder
-                    </span>
-                    <span className="text-stone-500">
-                      Marks the order as pending UPI payment. Gateway integration comes later.
-                    </span>
-                  </span>
-                </label>
-                <label className="flex cursor-pointer gap-3 rounded-lg border border-amber-200 p-3 text-sm">
-                  <input
-                    type="radio"
-                    name="paymentMethod"
-                    value="razorpay"
-                    checked={paymentMethod === "razorpay"}
-                    onChange={() => selectPaymentMethod("razorpay")}
-                    className="mt-1"
-                  />
-                  <span>
-                    <span className="block font-medium text-stone-900">
-                      Online payment (Razorpay)
-                    </span>
-                    <span className="text-stone-500">
-                      Pay using UPI/cards/netbanking/wallets. (INR only)
+                      Pay when your order is delivered. Status shows as pay on delivery.
                     </span>
                   </span>
                 </label>

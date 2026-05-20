@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
+import { getOrderById } from "@/lib/data/orders";
+import { dispatchOrderPlaced } from "@/lib/notifications";
 import { connectDB } from "@/lib/mongodb";
 import { Order } from "@/lib/models/Order";
 
@@ -58,6 +60,11 @@ export async function POST(request: NextRequest) {
     order.razorpayOrderId = razorpay_order_id;
     order.razorpayPaymentId = razorpay_payment_id;
     await order.save();
+
+    const orderDto = await getOrderById(orderId);
+    if (orderDto) {
+      dispatchOrderPlaced(orderDto);
+    }
 
     return NextResponse.json({ data: { ok: true } });
   } catch (error) {

@@ -3,6 +3,15 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { formatPrice } from "@/lib/utils";
+import type { OrderDTO, ShippingStatus } from "@/types";
+
+const SHIPPING_OPTIONS: ShippingStatus[] = [
+  "processing",
+  "packed",
+  "shipped",
+  "out_for_delivery",
+  "delivered",
+];
 
 interface Category {
   _id: string;
@@ -26,6 +35,7 @@ interface Product {
 export default function AdminPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [orders, setOrders] = useState<OrderDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -59,16 +69,20 @@ export default function AdminPage() {
     setLoading(true);
     setError("");
     try {
-      const [catRes, prodRes] = await Promise.all([
+      const [catRes, prodRes, ordRes] = await Promise.all([
         fetch("/api/admin/categories"),
         fetch("/api/admin/products"),
+        fetch("/api/admin/orders"),
       ]);
       const catJson = (await catRes.json()) as { data?: Category[]; error?: string };
       const prodJson = (await prodRes.json()) as { data?: Product[]; error?: string };
+      const ordJson = (await ordRes.json()) as { data?: OrderDTO[]; error?: string };
       if (!catRes.ok) throw new Error(catJson.error ?? "Failed to load categories");
       if (!prodRes.ok) throw new Error(prodJson.error ?? "Failed to load products");
+      if (!ordRes.ok) throw new Error(ordJson.error ?? "Failed to load orders");
       setCategories(catJson.data ?? []);
       setProducts(prodJson.data ?? []);
+      setOrders(ordJson.data ?? []);
 
       if (!draft.categorySlug && (catJson.data?.[0]?.slug ?? "")) {
         setDraft((prev) => ({ ...prev, categorySlug: catJson.data![0]!.slug }));
@@ -149,6 +163,22 @@ export default function AdminPage() {
     }
   }
 
+  async function onUpdateShipping(orderId: string, shippingStatus: ShippingStatus) {
+    setError("");
+    try {
+      const resp = await fetch(`/api/admin/orders/${orderId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shippingStatus }),
+      });
+      const json = (await resp.json()) as { error?: string };
+      if (!resp.ok) throw new Error(json.error ?? "Failed to update shipping");
+      await loadAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update shipping");
+    }
+  }
+
   async function onDelete(id: string) {
     if (!confirm("Delete this product?")) return;
     setError("");
@@ -167,7 +197,9 @@ export default function AdminPage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-stone-900">Admin</h1>
-          <p className="mt-1 text-stone-600">Manage products (price, photos, stock).</p>
+          <p className="mt-1 text-stone-600">
+            Manage products and update order shipping status.
+          </p>
         </div>
         <div className="flex gap-3">
           <Link
@@ -366,6 +398,54 @@ export default function AdminPage() {
           )}
         </div>
       </div>
+
+      <section className="mt-10 rounded-2xl border border-amber-200/70 bg-white p-6">
+        <h2 className="text-xl font-semibold text-stone-900">Orders & delivery</h2>
+        <p className="mt-1 text-sm text-stone-600">
+          Update shipping status. A tracking number is generated when status is set to
+          Shipped.
+        </p>
+        <div className="mt-4 space-y-4">
+          {orders.map((o) => (
+            <div key={o._id} className="rounded-xl border border-amber-100 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-stone-900">{o.orderNumber}</p>
+                  <p className="text-sm text-stone-500">{o.customer.name} · {o.customer.email}</p>
+                  <p className="mt-1 text-sm text-stone-600">
+                    {formatPrice(o.convertedTotal, o.currency)} · {o.paymentMethod} ·{" "}
+                    {o.paymentStatus}
+                  </p>
+                  {o.trackingNumber && (
+                    <p className="mt-1 font-mono text-sm text-amber-900">
+                      {o.trackingNumber}
+                    </p>
+                  )}
+                </div>
+                <label className="text-sm">
+                  <span className="font-medium text-stone-700">Shipping status</span>
+                  <select
+                    value={o.shippingStatus}
+                    onChange={(e) =>
+                      void onUpdateShipping(o._id, e.target.value as ShippingStatus)
+                    }
+                    className="mt-1 rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-200"
+                  >
+                    {SHIPPING_OPTIONS.map((s) => (
+                      <option key={s} value={s}>
+                        {s.replaceAll("_", " ")}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </div>
+          ))}
+          {orders.length === 0 && !loading && (
+            <p className="text-sm text-stone-600">No orders yet.</p>
+          )}
+        </div>
+      </section>
     </div>
   );
 }

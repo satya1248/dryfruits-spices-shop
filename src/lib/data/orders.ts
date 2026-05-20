@@ -7,6 +7,11 @@ import {
   getExchangeRate,
   isCurrencyCode,
 } from "@/lib/utils";
+import { getShippingStatusLabel, type ShippingStatus } from "@/lib/orderLabels";
+import {
+  dispatchOrderPlaced,
+  dispatchReadyForDelivery,
+} from "@/lib/notifications";
 import type {
   CartItem,
   CheckoutCustomer,
@@ -118,8 +123,22 @@ function toOrderDTO(doc: Record<string, unknown>): OrderDTO {
     razorpayOrderId: doc.razorpayOrderId as string | undefined,
     razorpayPaymentId: doc.razorpayPaymentId as string | undefined,
     status: doc.status as "placed" | "cancelled",
+    shippingStatus: (doc.shippingStatus as ShippingStatus | undefined) ?? "processing",
+    trackingNumber: doc.trackingNumber as string | undefined,
+    carrier: doc.carrier as string | undefined,
+    shippingUpdates: ((doc.shippingUpdates as Record<string, unknown>[]) ?? []).map(
+      (u) => ({
+        status: u.status as ShippingStatus,
+        message: u.message as string,
+        at: (u.at as Date).toISOString(),
+      }),
+    ),
     createdAt: (doc.createdAt as Date).toISOString(),
   };
+}
+
+function makeTrackingNumber(orderNumber: string): string {
+  return `BB-${orderNumber.replace(/^DF-/, "")}`;
 }
 
 export async function createOrder(input: CreateOrderInput): Promise<OrderDTO> {
@@ -174,9 +193,11 @@ export async function createOrder(input: CreateOrderInput): Promise<OrderDTO> {
     orderItems.reduce((sum, item) => sum + item.lineTotal, 0).toFixed(2),
   );
   const convertedSubtotal = convertFromInr(subtotal, currency);
+  const orderNumber = makeOrderNumber();
+  const initialShippingMessage = "Order received and being prepared";
 
   const order = await Order.create({
-    orderNumber: makeOrderNumber(),
+    orderNumber,
     customer,
     items: orderItems.map((item) => ({
       product: new Types.ObjectId(item.productId),
@@ -200,9 +221,24 @@ export async function createOrder(input: CreateOrderInput): Promise<OrderDTO> {
     paymentStatus: "pending",
     paymentProvider: paymentMethod === "razorpay" ? "razorpay" : undefined,
     status: "placed",
+    shippingStatus: "processing",
+    carrier: "Bala Balaji Delivery",
+    shippingUpdates: [
+      {
+        status: "processing",
+        message: initialShippingMessage,
+        at: new Date(),
+      },
+    ],
   });
 
-  return toOrderDTO(order.toObject() as Record<string, unknown>);
+  const orderDto = toOrderDTO(order.toObject() as Record<string, unknown>);
+
+  if (paymentMethod !== "razorpay") {
+    dispatchOrderPlaced(orderDto);
+  }
+
+  return orderDto;
 }
 
 export async function getOrderById(id: string): Promise<OrderDTO | null> {
@@ -216,4 +252,61 @@ export async function getOrderById(id: string): Promise<OrderDTO | null> {
   if (!order) return null;
 
   return toOrderDTO(order as Record<string, unknown>);
+}
+
+export async function trackOrder(
+  orderNumber: string,
+  email: string,
+): Promise<OrderDTO | null> {
+  await connectDB();
+  const order = await Order.findOne({
+    orderNumber: orderNumber.trim().toUpperCase(),
+    "customer.email": email.trim().toLowerCase(),
+  }).lean();
+
+  if (!order) return null;
+  return toOrderDTO(order as Record<string, unknown>);
+}
+
+export async function listOrdersForAdmin(): Promise<OrderDTO[]> {
+  await connectDB();
+  const orders = await Order.find().sort({ createdAt: -1 }).limit(50).lean();
+  return orders.map((o) => toOrderDTO(o as Record<string, unknown>));
+}
+
+export async function updateOrderShipping(
+  orderId: string,
+  shippingStatus: ShippingStatus,
+): Promise<OrderDTO> {
+  await connectDB();
+  const order = await Order.findById(orderId);
+  if (!order) throw new Error("Order not found");
+
+  const previousStatus = order.shippingStatus as ShippingStatus;
+
+  order.shippingStatus = shippingStatus;
+  const message = getShippingStatusLabel(shippingStatus);
+
+  if (shippingStatus === "shipped" && !order.trackingNumber) {
+    order.trackingNumber = makeTrackingNumber(order.orderNumber);
+  }
+
+  order.shippingUpdates.push({
+    status: shippingStatus,
+    message,
+    at: new Date(),
+  });
+
+  await order.save();
+
+  const orderDto = toOrderDTO(order.toObject() as Record<string, unknown>);
+
+  if (
+    shippingStatus === "out_for_delivery" &&
+    previousStatus !== "out_for_delivery"
+  ) {
+    dispatchReadyForDelivery(orderDto);
+  }
+
+  return orderDto;
 }
